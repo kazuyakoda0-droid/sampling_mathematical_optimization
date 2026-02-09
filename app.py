@@ -15,8 +15,14 @@ from data_loader import load_all_data, get_schedule_by_date
 app = Flask(__name__)
 
 # グローバル変数でデータをキャッシュ
-OPTIMIZATION_FILE = 'Mathematical Optimization_sampling_2026.xlsx'
-SCHEDULE_FILE = 'sample.xlsx'
+# 本番データ
+# OPTIMIZATION_FILE = 'Mathematical Optimization_sampling_2026.xlsx'
+# SCHEDULE_FILE = 'sample.xlsx'
+
+# デモ用サンプルデータ（匿名化済み）
+OPTIMIZATION_FILE = 'sample_data_demo.xlsx'
+SCHEDULE_FILE = 'sample_schedule_demo.xlsx'
+
 cached_data = None
 cached_results = None
 

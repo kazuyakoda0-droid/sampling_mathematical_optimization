@@ -26,7 +26,7 @@ def load_person_data(filepath: str) -> pd.DataFrame:
     """
     df = pd.read_excel(filepath, sheet_name='person')
     
-    # 列名を英語に変換
+    # 列名を英語に変換（日本語列名の場合のみ）
     column_mapping = {
         'Unnamed: 0': 'name',
         '優先順位': 'priority',
@@ -39,10 +39,17 @@ def load_person_data(filepath: str) -> pd.DataFrame:
         '操縦': 'navigation',
         '備考': 'notes'
     }
-    df = df.rename(columns=column_mapping)
+    
+    # 既存の列名とマッピングの交差部分のみ変換
+    existing_cols = {k: v for k, v in column_mapping.items() if k in df.columns}
+    if existing_cols:
+        df = df.rename(columns=existing_cols)
     
     # NaNを空文字に置換
-    df['notes'] = df['notes'].fillna('')
+    if 'notes' in df.columns:
+        df['notes'] = df['notes'].fillna('')
+    else:
+        df['notes'] = ''
     
     return df
 
@@ -56,7 +63,7 @@ def load_task_database(filepath: str) -> pd.DataFrame:
     """
     df = pd.read_excel(filepath, sheet_name='database')
     
-    # 列名を英語に変換
+    # 列名を英語に変換（日本語列名の場合のみ）
     column_mapping = {
         '番号': 'task_id',
         '業務名（略）': 'task_name',
@@ -69,7 +76,11 @@ def load_task_database(filepath: str) -> pd.DataFrame:
         '操船': 'navigation_required',
         '所要時間': 'duration'
     }
-    df = df.rename(columns=column_mapping)
+    
+    # 既存の列名とマッピングの交差部分のみ変換
+    existing_cols = {k: v for k, v in column_mapping.items() if k in df.columns}
+    if existing_cols:
+        df = df.rename(columns=existing_cols)
     
     # 所要時間の範囲表記を数値に変換（例: "0.5～3" -> 1.75）
     def parse_duration(val):
