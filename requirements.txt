@@ -1,0 +1,12 @@
+# Flask application
+flask>=3.0.0
+
+# Optimization
+pulp>=2.7.0
+
+# Data processing
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# Production WSGI server
+gunicorn>=21.0.0

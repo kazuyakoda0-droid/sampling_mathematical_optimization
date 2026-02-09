@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サンプリング業務 人員配置最適化システム</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <header class="header">
+            <h1>🔬 サンプリング業務 人員配置最適化システム</h1>
+            <p class="subtitle">2025年4月 スケジュール最適化</p>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="main-content">
+            <!-- コントロールパネル -->
+            <section class="control-panel glass-card">
+                <div class="control-header">
+                    <h2>⚙️ 最適化コントロール</h2>
+                </div>
+                <div class="control-body">
+                    <button id="optimizeBtn" class="btn btn-primary">
+                        <span class="btn-icon">🚀</span>
+                        全日程を最適化
+                    </button>
+                    <button id="downloadBtn" class="btn btn-secondary" disabled>
+                        <span class="btn-icon">📥</span>
+                        Excelダウンロード
+                    </button>
+                    <div id="statusMessage" class="status-message"></div>
+                </div>
+            </section>
+
+            <!-- カレンダービュー -->
+            <section class="calendar-section glass-card">
+                <div class="section-header">
+                    <h2>📅 スケジュール</h2>
+                    <div class="legend">
+                        <span class="legend-item"><span class="dot optimized"></span>最適化済</span>
+                        <span class="legend-item"><span class="dot pending"></span>未割当</span>
+                    </div>
+                </div>
+                <div id="calendarGrid" class="calendar-grid">
+                    <!-- 動的に生成 -->
+                </div>
+            </section>
+
+            <!-- 詳細ビュー -->
+            <section class="detail-section glass-card">
+                <div class="section-header">
+                    <h2>📋 <span id="selectedDateTitle">日付を選択してください</span></h2>
+                </div>
+                <div id="taskList" class="task-list">
+                    <p class="placeholder">左のカレンダーから日付を選択すると、その日の業務と割り当て結果が表示されます。</p>
+                </div>
+            </section>
+
+            <!-- 作業者一覧 -->
+            <section class="persons-section glass-card">
+                <div class="section-header">
+                    <h2>👥 作業者一覧</h2>
+                </div>
+                <div id="personsList" class="persons-grid">
+                    <!-- 動的に生成 -->
+                </div>
+            </section>
+        </main>
+
+        <!-- フッター -->
+        <footer class="footer">
+            <p>© 2026 サンプリング業務最適化システム</p>
+        </footer>
+    </div>
+
+    <script>
+        // アプリケーション状態
+        let appState = {
+            dates: [],
+            persons: [],
+            schedule: [],
+            results: {},
+            selectedDate: null
+        };
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadInitialData();
+            setupEventListeners();
+        });
+
+        // 初期データ読み込み
+        async function loadInitialData() {
+            try {
+                showStatus('データを読み込み中...', 'loading');
+                const response = await fetch('/api/data');
+                const data = await response.json();
+
+                appState.dates = data.dates;
+                appState.persons = data.persons;
+                appState.schedule = data.schedule;
+
+                renderCalendar();
+                renderPersons();
+                showStatus('データを読み込みました', 'success');
+                setTimeout(() => hideStatus(), 2000);
+            } catch (error) {
+                showStatus('データの読み込みに失敗しました', 'error');
+                console.error(error);
+            }
+        }
+
+        // イベントリスナー設定
+        function setupEventListeners() {
+            document.getElementById('optimizeBtn').addEventListener('click', runOptimization);
+            document.getElementById('downloadBtn').addEventListener('click', downloadResults);
+        }
+
+        // 最適化実行
+        async function runOptimization() {
+            const btn = document.getElementById('optimizeBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="btn-icon">⏳</span> 最適化中...';
+
+            showStatus('最適化を実行中...', 'loading');
+
+            try {
+                const response = await fetch('/api/optimize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    appState.results = data.results;
+                    renderCalendar();
+                    if (appState.selectedDate) {
+                        showDateDetail(appState.selectedDate);
+                    }
+                    showStatus('最適化が完了しました！', 'success');
+                    // ダウンロードボタンを有効化
+                    document.getElementById('downloadBtn').disabled = false;
+                } else {
+                    showStatus('最適化に失敗しました: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('エラーが発生しました', 'error');
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="btn-icon">🚀</span> 全日程を最適化';
+            }
+        }
+
+        // 結果をExcelでダウンロード
+        function downloadResults() {
+            window.location.href = '/api/download';
+        }
+
+        // カレンダー描画
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            appState.schedule.forEach(day => {
+                const hasResults = appState.results[day.date] &&
+                    Object.values(appState.results[day.date]).some(arr => arr.length > 0);
+
+                const card = document.createElement('div');
+                card.className = `calendar-card ${hasResults ? 'optimized' : ''} ${appState.selectedDate === day.date ? 'selected' : ''}`;
+                card.onclick = () => selectDate(day.date);
+
+                const date = new Date(day.date);
+                const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+                const dayOfWeek = dayNames[date.getDay()];
+                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+
+                card.innerHTML = `
+                    <div class="card-date ${isWeekend ? 'weekend' : ''}">
+                        <span class="month">${date.getMonth() + 1}月</span>
+                        <span class="day">${date.getDate()}</span>
+                        <span class="weekday">(${dayOfWeek})</span>
+                    </div>
+                    <div class="card-info">
+                        <span class="task-count">${day.task_count}件</span>
+                        ${hasResults ? '<span class="badge optimized">✓</span>' : '<span class="badge pending">未</span>'}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // 日付選択
+        function selectDate(dateStr) {
+            appState.selectedDate = dateStr;
+            renderCalendar();
+            showDateDetail(dateStr);
+        }
+
+        // 日付詳細表示
+        async function showDateDetail(dateStr) {
+            const titleEl = document.getElementById('selectedDateTitle');
+            const listEl = document.getElementById('taskList');
+
+            const date = new Date(dateStr);
+            const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+            titleEl.textContent = `${date.getMonth() + 1}月${date.getDate()}日 (${dayNames[date.getDay()]})`;
+
+            try {
+                const response = await fetch(`/api/schedule/${dateStr}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    renderTaskList(data.tasks, data.assignments);
+                }
+            } catch (error) {
+                listEl.innerHTML = '<p class="error">データの取得に失敗しました</p>';
+            }
+        }
+
+        // タスクリスト描画
+        function renderTaskList(tasks, assignments) {
+            const listEl = document.getElementById('taskList');
+            listEl.innerHTML = '';
+
+            tasks.forEach(taskName => {
+                const assigned = assignments[taskName] || [];
+                const card = document.createElement('div');
+                card.className = `task-card ${assigned.length > 0 ? 'assigned' : 'unassigned'}`;
+
+                card.innerHTML = `
+                    <div class="task-name">${taskName}</div>
+                    <div class="task-assignment">
+                        ${assigned.length > 0
+                        ? assigned.map(p => `<span class="person-tag">${p}</span>`).join('')
+                        : '<span class="no-assignment">未割当</span>'
+                    }
+                    </div>
+                `;
+                listEl.appendChild(card);
+            });
+        }
+
+        // 作業者一覧描画
+        function renderPersons() {
+            const container = document.getElementById('personsList');
+            container.innerHTML = '';
+
+            appState.persons.forEach(person => {
+                const card = document.createElement('div');
+                card.className = 'person-card';
+
+                const notes = person.notes || '';
+
+                card.innerHTML = `
+                    <div class="person-name">${person.name}</div>
+                    ${notes ? `<div class="person-notes">${notes}</div>` : ''}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // ステータスメッセージ表示
+        function showStatus(message, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = message;
+            el.className = `status-message ${type}`;
+            el.style.display = 'block';
+        }
+
+        function hideStatus() {
+            document.getElementById('statusMessage').style.display = 'none';
+        }
+    </script>
+</body>
+
+</html>
